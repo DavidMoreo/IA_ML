@@ -1,7 +1,9 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Globalization;
 using System.IO;
 using System.Linq;
+using System.Text;
 using Microsoft.ML;
 using Microsoft.ML.Data;
 using Newtonsoft.Json;
@@ -12,18 +14,12 @@ class Program
     {
         var context = new MLContext();
 
-        // Cargar datos de entrenamiento desde JSON
-        //var trainingDataWarranty = LoadDataFromJson<QuestionPair>("trainingData/trainingDataWarranty.json");
-        //var trainingDataInstructionsForUse = LoadDataFromJson<QuestionPair>("trainingData/trainingDataInstructionsForUse.json");
-
-        // Concatenar los datos de los dos conjuntos
-         var folderPath = "trainingData/";
-
         // Cargar y combinar datos desde todos los archivos JSON en la carpeta
-
+        var folderPath = "trainingData/";
         var trainingData = LoadDataFromFolder<QuestionPair>(folderPath);
 
-
+        // Filtrar stopwords y convertir a minúsculas antes de continuar con los datos de entrenamiento
+        trainingData = PreprocessData(trainingData);
 
         // Convertir las listas a IDataView
         var trainData = context.Data.LoadFromEnumerable(trainingData);
@@ -107,19 +103,29 @@ class Program
         // Cargar los datos de prueba desde JSON
         var testData = LoadDataFromJson<QuestionPair>("testData.json");
 
+        // Filtrar stopwords y convertir a minúsculas antes de evaluar
+        var processedTestData = PreprocessData(testData);
+
         // Convertir las listas a IDataView
-        var testDataView = context.Data.LoadFromEnumerable(testData);
+        var testDataView = context.Data.LoadFromEnumerable(processedTestData);
 
         // Crear el predictor
         var predictor = context.Model.CreatePredictionEngine<QuestionPair, QuestionPrediction>(model);
 
         // Mostrar predicciones
-        foreach (var questionPair in testData)
+        foreach (var questionPair in processedTestData)
         {
             var prediction = predictor.Predict(questionPair);
             int matchingWordsCount = CountMatchingWords(questionPair.Question1, questionPair.Question2);
             // Ajustar el puntaje de la predicción basado en el número de palabras coincidentes
-            prediction.PredictedLabel += matchingWordsCount * 0.1f;
+            if (matchingWordsCount == 0)
+            {
+                prediction.PredictedLabel -= (questionPair.Question1.Split(" ").Length + questionPair.Question2.Split(" ").Length * 0.3f);
+            }
+            else
+            {
+                prediction.PredictedLabel += matchingWordsCount * 0.1f;
+            }
 
             Console.WriteLine($"Question1: {questionPair.Question1}");
             Console.WriteLine($"Question2: {questionPair.Question2}");
@@ -131,27 +137,68 @@ class Program
     static string[] FilterStopWords(string[] tokens)
     {
         var stopwords = new HashSet<string>(new[]
-   {
+        {
         "el", "la", "los", "las", "de", "en", "y", "a", "que", "es", "con", "por", "como", "para", "un", "una", "al", "se",
         "él", "ella", "ellos", "ellas", "del", "á", "é", "í", "ó", "ú", "áéíóú", "cómo", "cuándo", "dónde", "qué", "qué"
         // Añade más palabras comunes acentuadas si es necesario
     });
 
-        return tokens.Where(token => !stopwords.Contains(token.ToLower())).ToArray();
+        var list = tokens.Where(token => !stopwords.Contains(token.ToLower())).ToArray();
+
+
+        for (int i = 0; i < list.Count(); i++)
+        {
+            list[i] = CleanStopword(list[i]);
+        }
+
+        return list;
+    }
+    static string CleanStopword(string stopword)
+    {
+        // Define los caracteres o secuencias a reemplazar
+        var charactersToRemove = new List<string> { "?", "¿", "!", "¡", ".", "," };
+
+        foreach (var character in charactersToRemove)
+        {
+            stopword = stopword.Replace(character, "");
+        }
+
+        return stopword;
     }
 
     static int CountMatchingWords(string text1, string text2)
     {
-        var tokens1 = FilterStopWords(Tokenize(text1));
-        var tokens2 = FilterStopWords(Tokenize(text2));
+        var tokens1 = FilterStopWords(Tokenize(RemoveAccents(text1.ToLower())));
+        var tokens2 = FilterStopWords(Tokenize(RemoveAccents(text2.ToLower())));
 
         return tokens1.Intersect(tokens2).Count();
+    }
+
+    // Función para eliminar acentos
+    static string RemoveAccents(string text)
+    {
+        var t = new string(text.Normalize(NormalizationForm.FormD)
+            .Where(ch => CharUnicodeInfo.GetUnicodeCategory(ch) != UnicodeCategory.NonSpacingMark)
+            .ToArray())
+            .Normalize(NormalizationForm.FormC);
+
+        return t;
     }
 
     static string[] Tokenize(string text)
     {
         // Tokenizar el texto en palabras
         return text.Split(new[] { ' ', '\t', '\n', '\r' }, StringSplitOptions.RemoveEmptyEntries);
+    }
+
+    static IEnumerable<QuestionPair> PreprocessData(IEnumerable<QuestionPair> data)
+    {
+        return data.Select(pair => new QuestionPair
+        {
+            Question1 = string.Join(" ", FilterStopWords(Tokenize(pair.Question1.ToLower()))),
+            Question2 = string.Join(" ", FilterStopWords(Tokenize(pair.Question2.ToLower()))),
+            Label = pair.Label
+        }).ToList();
     }
 }
 
@@ -186,9 +233,9 @@ public static class TokenWeights
 {
     private static readonly Dictionary<string, float> Weights = new Dictionary<string, float>
     {
-        { "sujeto", 2.0f },
-        { "verbo", 5.5f },
-        { "nombre", 1.2f },
+        { "sujeto", 0f },
+        { "verbo", 0f },
+        { "nombre", 0f },
         // Añadir más ponderaciones si es necesario
     };
 
