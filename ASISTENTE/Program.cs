@@ -1,279 +1,159 @@
 ﻿using System;
 using System.Collections.Generic;
-using System.Globalization;
 using System.IO;
 using System.Linq;
-using System.Text;
 using Microsoft.ML;
 using Microsoft.ML.Data;
 using Newtonsoft.Json;
 
-class Program
+public class QuestionPair
 {
-    static void Main(string[] args)
+    public string Question { get; set; }
+    public string Answer { get; set; }
+}
+
+public class QuestionPairInput
+{
+    [LoadColumn(0)]
+    public string Question { get; set; }
+
+    [LoadColumn(1)]
+    public string Answer { get; set; }
+
+    [LoadColumn(2)]
+    public bool Label { get; set; }
+}
+
+public class QuestionPairOutput
+{
+    [ColumnName("PredictedLabel")]
+    public string Answer { get; set; }
+}
+
+public class QuestionAnswerModel
+{
+    // Método para cargar datos desde archivos JSON en una carpeta
+    public static List<QuestionPair> LoadDataFromFolder(string folderPath)
     {
-        var context = new MLContext();
+        var trainingData = new List<QuestionPair>();
 
-        // Cargar y combinar datos desde todos los archivos JSON en la carpeta
-        var folderPath = "trainingData/";
-        var trainingData = LoadDataFromFolder<QuestionPair>(folderPath);
-
-        // Filtrar stopwords y convertir a minúsculas antes de continuar con los datos de entrenamiento
-        trainingData = PreprocessData(trainingData);
-
-        // Convertir las listas a IDataView
-        var trainData = context.Data.LoadFromEnumerable(trainingData);
-
-        // Crear el pipeline de entrenamiento
-        var pipeline = context.Transforms.Text.TokenizeIntoWords("Tokens1", nameof(QuestionPair.Question1))
-            .Append(context.Transforms.Text.TokenizeIntoWords("Tokens2", nameof(QuestionPair.Question2)))
-            .Append(context.Transforms.CustomMapping<FilterStopWordsInput, FilterStopWordsOutput>(
-                (input, output) =>
-                {
-                    output.Tokens1 = FilterStopWords(input.Tokens1);
-                    output.Tokens2 = FilterStopWords(input.Tokens2);
-                }, "FilterStopWords"))
-            .Append(context.Transforms.Text.FeaturizeText("Features1", nameof(FilterStopWordsOutput.Tokens1)))
-            .Append(context.Transforms.Text.FeaturizeText("Features2", nameof(FilterStopWordsOutput.Tokens2)))
-            .Append(context.Transforms.Concatenate("Features", "Features1", "Features2"))
-            .Append(context.BinaryClassification.Trainers.SdcaLogisticRegression("Label", "Features")); // Algoritmo de clasificación
-
-        // Entrenar el modelo
-        var model = pipeline.Fit(trainData);
-
-        // Ruta del archivo del modelo
-        var modelPath = "qaModel.zip";
-
-        // Guardar el modelo
-        context.Model.Save(model, trainData.Schema, modelPath);
-        Console.WriteLine("Modelo entrenado y guardado.");
-
-        // Mostrar el tamaño del archivo del modelo
-        var fileInfo = new FileInfo(modelPath);
-        Console.WriteLine($"Tamaño del archivo del modelo: {fileInfo.Length / 1024.0} KB");
-
-        // Mostrar predicciones con datos de entrenamiento
-        ShowPredictions(context, model, trainingData);
-
-        // Evaluar el modelo con datos de prueba
-        EvaluateModelWithTestData(context, model);
-    }
-
-    static IEnumerable<T> LoadDataFromFolder<T>(string folderPath)
-    {
-        var files = Directory.GetFiles(folderPath, "*.json");
-
-        var combinedData = new List<T>();
-        foreach (var file in files)
+        foreach (var filePath in Directory.GetFiles(folderPath, "*.json"))
         {
-            var jsonData = File.ReadAllText(file);
-            var data = JsonConvert.DeserializeObject<List<T>>(jsonData);
-            combinedData.AddRange(data);
-        }
+            var jsonData = File.ReadAllText(filePath);
+            var questionPairs = JsonConvert.DeserializeObject<List<QuestionPair>>(jsonData);
 
-        return combinedData;
-    }
-
-    static IEnumerable<T> LoadDataFromJson<T>(string filePath)
-    {
-        var jsonData = File.ReadAllText(filePath);
-        return JsonConvert.DeserializeObject<List<T>>(jsonData);
-    }
-
-    static void ShowPredictions(MLContext context, ITransformer model, IEnumerable<QuestionPair> trainingData)
-    {
-        var predictor = context.Model.CreatePredictionEngine<QuestionPair, QuestionPrediction>(model);
-
-        //foreach (var questionPair in trainingData)
-        //{
-        //    var prediction = predictor.Predict(questionPair);
-        //    int matchingWordsCount = CountMatchingWords(questionPair.Question1, questionPair.Question2);
-        //    // Ajustar el puntaje de la predicción basado en el número de palabras coincidentes
-        //    prediction.PredictedLabel += matchingWordsCount * 0.1f;
-
-        //    Console.WriteLine($"Question1: {questionPair.Question1}");
-        //    Console.WriteLine($"Question2: {questionPair.Question2}");
-        //    Console.WriteLine($"Predicted Label: {prediction.PredictedLabel}");
-        //    Console.WriteLine();
-        //}
-    }
-
-    static void EvaluateModelWithTestData(MLContext context, ITransformer model)
-    {
-        // Cargar los datos de prueba desde la carpeta
-        var folderPath = "trainingData/";
-        var testData = LoadDataFromFolder<QuestionPair>(folderPath);
-
-        // Preprocesar los datos de prueba
-        testData = PreprocessData(testData);
-
-        // Convertir las listas a IDataView
-        var testDataView = context.Data.LoadFromEnumerable(testData);
-
-        // Crear el predictor
-        var predictor = context.Model.CreatePredictionEngine<QuestionPair, QuestionPrediction>(model);
-
-        while (true)
-        {
-            Console.WriteLine("Pregunta 1 (escribe 'salir' para terminar):");
-            var question1 = Console.ReadLine();
-
-            if (question1?.ToLower() == "salir")
-                break;
-
-            QuestionPair bestPrediction = null;
-            float bestScore = float.MinValue;
-
-            foreach (var questionPair in testData)
+            // Filtrar las palabras vacías de las preguntas
+            foreach (var pair in questionPairs)
             {
-                var prediction = predictor.Predict(questionPair);
-                int matchingWordsCount = CountMatchingWords(question1, questionPair.Question2);
-
-                // Ajustar el puntaje de la predicción basado en el número de palabras coincidentes
-                if (matchingWordsCount == 0)
-                {
-                    prediction.PredictedLabel -= (questionPair.Question1.Split(" ").Length + questionPair.Question2.Split(" ").Length * 0.3f);
-                }
-                else
-                {
-                    prediction.PredictedLabel += matchingWordsCount * 0.1f;
-                }
-
-                // Comparar y almacenar la mejor predicción
-                if (prediction.PredictedLabel > bestScore)
-                {
-                    bestScore = prediction.PredictedLabel;
-                    bestPrediction = questionPair;
-                }
+                pair.Question = string.Join(" ", FilterStopWords(pair.Question.Split(' ')));
             }
 
-            // Mostrar la mejor predicción
-            if (bestPrediction != null)
-            {
-               // Console.WriteLine($"Mejor Predicción para la Pregunta 1: {question1}");
-              //  Console.WriteLine($"Pregunta 2: {bestPrediction.Question2}");
-                Console.WriteLine($"Respuesta: {bestPrediction.Response}");
-                Console.WriteLine($"Etiqueta Predicha: {bestScore}");
-                Console.WriteLine();
-            }
+            trainingData.AddRange(questionPairs);
         }
+
+        return trainingData;
     }
 
+    // Método para entrenar el modelo
+    public static void TrainModel(string folderPath)
+    {
+        // Cargar los datos
+        var trainingData = LoadDataFromFolder(folderPath);
 
+        // Crear el contexto de ML.NET
+        var mlContext = new MLContext();
 
+        // Convertir los datos en un IDataView
+        var data = mlContext.Data.LoadFromEnumerable(trainingData);
+
+        // Preprocesamiento de datos (Convertir texto en números)
+        var dataPipeline = mlContext.Transforms.Text.FeaturizeText("Features", nameof(QuestionPair.Question))
+            .Append(mlContext.Transforms.Conversion.MapValueToKey("Label", nameof(QuestionPair.Answer)))
+            .Append(mlContext.Transforms.NormalizeMinMax("Features"));
+
+        // Algoritmo de clasificación multiclase
+        var trainer = mlContext.MulticlassClassification.Trainers.SdcaMaximumEntropy(labelColumnName: "Label", featureColumnName: "Features")
+            .Append(mlContext.Transforms.Conversion.MapKeyToValue("PredictedLabel"));
+
+        // Entrenamiento del modelo
+        var trainingPipeline = dataPipeline.Append(trainer);
+        var model = trainingPipeline.Fit(data);
+
+        // Guardar el modelo entrenado
+        mlContext.Model.Save(model, data.Schema, "questionAnswerModel.zip");
+    }
+
+    // Método para predecir la respuesta basada en una pregunta
+    public static string PredictAnswer(string question)
+    {
+        var mlContext = new MLContext();
+
+        // Filtrar palabras vacías de la pregunta
+        var filteredQuestion = string.Join(" ", FilterStopWords(question.Split(' ')));
+
+        // Cargar el modelo entrenado
+        var model = mlContext.Model.Load("questionAnswerModel.zip", out var schema);
+
+        // Crear un predictor
+        var predictor = mlContext.Model.CreatePredictionEngine<QuestionPairInput, QuestionPairOutput>(model);
+
+        // Predecir la respuesta
+        var input = new QuestionPairInput { Question = filteredQuestion };
+        var result = predictor.Predict(input);
+
+        return result.Answer;
+    }
+
+    // Método para filtrar palabras vacías de un conjunto de tokens
     static string[] FilterStopWords(string[] tokens)
     {
         var stopwords = new HashSet<string>(new[]
         {
-        "el", "la", "los", "las", "de", "en", "y", "a", "que", "es", "con", "por", "como", "para", "un", "una", "al", "se",
-        "él", "ella", "ellos", "ellas", "del", "á", "é", "í", "ó", "ú", "áéíóú", "cómo", "cuándo", "dónde", "qué", "qué"
-        // Añade más palabras comunes acentuadas si es necesario
-    });
+            "el", "la", "los", "las", "de", "en", "y", "a", "que", "es", "con", "por", "como", "para", "un", "una", "al", "se",
+            "él", "ella", "ellos", "ellas", "del", "á", "é", "í", "ó", "ú", "áéíóú", "cómo", "cuándo", "dónde", "qué", "qué"
+            // Añade más palabras comunes acentuadas si es necesario
+        });
 
         var list = tokens.Where(token => !stopwords.Contains(token.ToLower())).ToArray();
 
-
-        for (int i = 0; i < list.Count(); i++)
+        for (int i = 0; i < list.Length; i++)
         {
             list[i] = CleanStopword(list[i]);
         }
 
         return list;
     }
-    static string CleanStopword(string stopword)
-    {
-        // Define los caracteres o secuencias a reemplazar
-        var charactersToRemove = new List<string> { "?", "¿", "!", "¡", ".", "," };
 
-        foreach (var character in charactersToRemove)
+    // Método para limpiar una palabra si es necesario
+    static string CleanStopword(string token)
+    {
+        // Aquí podrías añadir lógica adicional para limpiar el token si es necesario
+        return token;
+    }
+}
+
+class Program
+{
+    static void Main(string[] args)
+    {
+        // Entrenar el modelo (esto lo haces una vez)
+        QuestionAnswerModel.TrainModel("trainingData/");
+
+        // Bucle infinito para permitir preguntas continuas
+        while (true)
         {
-            stopword = stopword.Replace(character, "");
+            Console.WriteLine("Ingrese su pregunta (o 'salir' para terminar):");
+            var question = Console.ReadLine();
+
+            if (string.Equals(question, "salir", StringComparison.OrdinalIgnoreCase))
+            {
+                break;
+            }
+
+            // Usar el modelo para hacer una predicción solo con la pregunta
+            string answer = QuestionAnswerModel.PredictAnswer(question);
+
+            Console.WriteLine($"Respuesta: '{answer}'");
         }
-
-        return stopword;
-    }
-
-    static int CountMatchingWords(string text1, string text2)
-    {
-        var tokens1 = FilterStopWords(Tokenize(RemoveAccents(text1.ToLower())));
-        var tokens2 = FilterStopWords(Tokenize(RemoveAccents(text2.ToLower())));
-
-        return tokens1.Intersect(tokens2).Count();
-    }
-
-    // Función para eliminar acentos
-    static string RemoveAccents(string text)
-    {
-        var t = new string(text.Normalize(NormalizationForm.FormD)
-            .Where(ch => CharUnicodeInfo.GetUnicodeCategory(ch) != UnicodeCategory.NonSpacingMark)
-            .ToArray())
-            .Normalize(NormalizationForm.FormC);
-
-        return t;
-    }
-
-    static string[] Tokenize(string text)
-    {
-        // Tokenizar el texto en palabras
-        return text.Split(new[] { ' ', '\t', '\n', '\r' }, StringSplitOptions.RemoveEmptyEntries);
-    }
-
-    static IEnumerable<QuestionPair> PreprocessData(IEnumerable<QuestionPair> data)
-    {
-        return data.Select(pair => new QuestionPair
-        {
-            Question1 = string.Join(" ", FilterStopWords(Tokenize(pair.Question1.ToLower()))),
-            Question2 = string.Join(" ", FilterStopWords(Tokenize(pair.Question2.ToLower()))),  
-            Question1Cache = pair.Question1, 
-            Question2Cache = pair.Question2, 
-            Response  = pair.Response,  
-            Label = pair.Label
-        }).ToList();
-    }
-}
-
-// Clases de datos
-public class QuestionPair
-{
-    public string Question1 { get; set; }
-    public string Question2 { get; set; }
-    public string Question1Cache { get; set; }
-    public string Question2Cache { get; set; }
-    public string Response { get; set; }
-    public bool Label { get; set; } // Añadido para la clasificación
-}
-
-public class QuestionPrediction
-{
-    [ColumnName("Score")]
-    public float PredictedLabel { get; set; }
-}
-
-// Clases para la eliminación de stopwords y ponderación
-public class FilterStopWordsInput
-{
-    public string[] Tokens1 { get; set; }
-    public string[] Tokens2 { get; set; }
-}
-
-public class FilterStopWordsOutput
-{
-    public string[] Tokens1 { get; set; }
-    public string[] Tokens2 { get; set; }
-}
-
-public static class TokenWeights
-{
-    private static readonly Dictionary<string, float> Weights = new Dictionary<string, float>
-    {
-        { "sujeto", 0f },
-        { "verbo", 0f },
-        { "nombre", 0f },
-        // Añadir más ponderaciones si es necesario
-    };
-
-    public static float GetWeight(string token)
-    {
-        return Weights.TryGetValue(token.ToLower(), out var weight) ? weight : 1.0f;
     }
 }
