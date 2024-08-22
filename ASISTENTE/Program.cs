@@ -28,6 +28,8 @@ public class QuestionPairOutput
 {
     [ColumnName("PredictedLabel")]
     public string Answer { get; set; }
+
+    public float[] Score { get; set; }  // Puntajes de confianza para cada clase
 }
 
 public class QuestionAnswerModel
@@ -84,7 +86,7 @@ public class QuestionAnswerModel
     }
 
     // Método para predecir la respuesta basada en una pregunta
-    public static string PredictAnswer(string question)
+    public static (string Answer, float Score) PredictAnswer(string question)
     {
         var mlContext = new MLContext();
 
@@ -101,7 +103,11 @@ public class QuestionAnswerModel
         var input = new QuestionPairInput { Question = filteredQuestion };
         var result = predictor.Predict(input);
 
-        return result.Answer;
+        // Obtener el puntaje más alto y su índice
+        var maxScore = result.Score.Max();
+        var predictedAnswer = result.Answer;
+
+        return (predictedAnswer, maxScore);
     }
 
     // Método para filtrar palabras vacías de un conjunto de tokens
@@ -151,9 +157,10 @@ class Program
             }
 
             // Usar el modelo para hacer una predicción solo con la pregunta
-            string answer = QuestionAnswerModel.PredictAnswer(question);
+            var (answer, score) = QuestionAnswerModel.PredictAnswer(question);
 
-            Console.WriteLine($"Respuesta: '{answer}'");
+            Console.WriteLine($"Respuesta: '{answer}' ");
+            Console.WriteLine($" : {score}");
         }
     }
 }
