@@ -57,16 +57,20 @@ public class QuestionAnswerModel
     }
 
     // Método para entrenar el modelo
-    public static void TrainModel(string folderPath)
+    public static async void TrainModel(string folderPath)
     {
         // Cargar los datos
-        var trainingData = LoadDataFromFolder(folderPath);
+        //var trainingData = LoadDataFromFolder(folderPath);
+
+      
 
         // Crear el contexto de ML.NET
         var mlContext = new MLContext();
 
+        var trainingData = await GetHttp();
+
         // Convertir los datos en un IDataView
-        var data = mlContext.Data.LoadFromEnumerable(trainingData);
+       var data = mlContext.Data.LoadFromEnumerable(trainingData);
 
         // Preprocesamiento de datos (Convertir texto en números)
         var dataPipeline = mlContext.Transforms.Text.FeaturizeText("Features", nameof(QuestionPair.Question))
@@ -83,6 +87,31 @@ public class QuestionAnswerModel
 
         // Guardar el modelo entrenado
         mlContext.Model.Save(model, data.Schema, "questionAnswerModel.zip");
+    }
+
+
+
+    public async static Task<List<QuestionPair>> GetHttp()
+    {
+        HttpClient client = new HttpClient();
+        var list = new List<QuestionPair>();
+
+        client.BaseAddress = new Uri("https://localhost:7049/");
+
+        try
+        {
+            var http = await client.GetAsync("Chat/GetModelToTrainAssistan");
+            var respose = await http.Content.ReadAsStringAsync();
+            list = JsonConvert.DeserializeObject<List<QuestionPair>>(respose);
+            Console.WriteLine("Cantidad de registro :" + list.Count);
+        }
+        catch (Exception ex)
+        {
+
+            throw;
+        }
+        return list;
+
     }
 
     // Método para predecir la respuesta basada en una pregunta

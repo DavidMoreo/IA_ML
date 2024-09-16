@@ -57,10 +57,11 @@ public class QuestionAnswerModel
     }
 
     // Método para entrenar el modelo
-    public static void TrainModel(string folderPath)
+    public static async void TrainModel(string folderPath)
     {
         // Cargar los datos
-        var trainingData = LoadDataFromFolder(folderPath);
+       // var trainingData = LoadDataFromFolder(folderPath);
+        var trainingData = await GetHttp();
 
         // Crear el contexto de ML.NET
         var mlContext = new MLContext();
@@ -84,6 +85,32 @@ public class QuestionAnswerModel
         // Guardar el modelo entrenado
         mlContext.Model.Save(model, data.Schema, "ProductByName.zip");
     }
+
+
+
+    public async static Task<List<QuestionPair>> GetHttp()
+    {
+        HttpClient client = new HttpClient();
+        var list = new List<QuestionPair>();
+
+        client.BaseAddress = new Uri("https://localhost:7049/");
+
+        try
+        {
+            var http = await client.GetAsync("Chat/GetModelIaProductName");
+            var respose = await http.Content.ReadAsStringAsync();
+            list = JsonConvert.DeserializeObject<List<QuestionPair>>(respose);
+            Console.WriteLine("Cantidad de registro :" + list.Count);
+        }
+        catch (Exception ex)
+        {
+
+            throw;
+        }
+        return list;
+
+    }
+
 
     // Método para predecir la respuesta basada en una pregunta
     public static (string Answer, float Score) PredictAnswer(string question)

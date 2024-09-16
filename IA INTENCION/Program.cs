@@ -58,10 +58,13 @@ public class IntentModel
     }
 
     // Método para entrenar el modelo
-    public static void TrainModel(string folderPath)
+    public static async void TrainModel(string folderPath)
     {
         // Cargar los datos
-        var trainingData = LoadDataFromFolder(folderPath);
+        //var trainingData = LoadDataFromFolder(folderPath);
+
+
+        var trainingData = await GetHttp();
 
         // Crear el contexto de ML.NET
         var mlContext = new MLContext();
@@ -85,6 +88,30 @@ public class IntentModel
         // Guardar el modelo entrenado
         mlContext.Model.Save(model, data.Schema, "intentModel.zip");
     }
+
+    public async static Task<List<MessageData>> GetHttp()
+    {
+        HttpClient client = new HttpClient();
+        var list = new List<MessageData>();
+
+        client.BaseAddress = new Uri("https://localhost:7049/");
+
+        try
+        {
+         var http = await client.GetAsync("Chat/GetModelToTrainIntent");
+            var respose = await http.Content.ReadAsStringAsync();
+            list = JsonConvert.DeserializeObject<List<MessageData>>(respose);
+            Console.WriteLine("Cantidad de registro :"+ list.Count);
+        }
+        catch (Exception ex)
+        {
+
+            throw;
+        }
+        return list;
+
+    }
+
 
     // Método para predecir la intención basada en un mensaje
     public static string PredictIntent(string text)
