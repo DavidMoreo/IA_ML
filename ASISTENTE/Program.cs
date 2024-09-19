@@ -82,11 +82,14 @@ public class QuestionAnswerModel
             .Append(mlContext.Transforms.Conversion.MapKeyToValue("PredictedLabel"));
 
         // Entrenamiento del modelo
+        Console.WriteLine("Entrenando modelo");
         var trainingPipeline = dataPipeline.Append(trainer);
         var model = trainingPipeline.Fit(data);
 
         // Guardar el modelo entrenado
+        Console.WriteLine("Guardando modelo");
         mlContext.Model.Save(model, data.Schema, "questionAnswerModel.zip");
+        Console.WriteLine("Modelo Guardado");
     }
 
 
