@@ -10,6 +10,8 @@ public class QuestionPair
 {
     public string Question { get; set; }
     public string Answer { get; set; }
+
+    public bool Label { get; set; }
 }
 
 public class QuestionPairInput
@@ -79,11 +81,14 @@ public class QuestionAnswerModel
             .Append(mlContext.Transforms.Conversion.MapKeyToValue("PredictedLabel"));
 
         // Entrenamiento del modelo
+        Console.WriteLine("Entrenamiento");
         var trainingPipeline = dataPipeline.Append(trainer);
         var model = trainingPipeline.Fit(data);
 
         // Guardar el modelo entrenado
+        Console.WriteLine("Guardando modelo");
         mlContext.Model.Save(model, data.Schema, "ProductByName.zip");
+        Console.WriteLine("modelo Guardado");
     }
 
 
@@ -93,11 +98,11 @@ public class QuestionAnswerModel
         HttpClient client = new HttpClient();
         var list = new List<QuestionPair>();
 
-        client.BaseAddress = new Uri("https://localhost:7049/");
+        client.BaseAddress = new Uri("https://gotaskservice.com/");
 
         try
         {
-            var http = await client.GetAsync("Chat/GetModelIaProductName");
+            var http = await client.GetAsync("Chat/GetTrainIaProductName");
             var respose = await http.Content.ReadAsStringAsync();
             list = JsonConvert.DeserializeObject<List<QuestionPair>>(respose);
             Console.WriteLine("Cantidad de registro :" + list.Count);
