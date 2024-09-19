@@ -96,7 +96,8 @@ public class QuestionAnswerModel
         HttpClient client = new HttpClient();
         var list = new List<QuestionPair>();
 
-        client.BaseAddress = new Uri("https://localhost:7049/");
+        //client.BaseAddress = new Uri("https://localhost:7049/");
+        client.BaseAddress = new Uri("https://gotaskservice.com/");
 
         try
         {

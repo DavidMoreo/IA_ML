@@ -12,14 +12,61 @@ class Program
 {
     static void Main(string[] args)
     {
-        var context = new MLContext();
 
+        Console.WriteLine("Entrenando..");
         // Cargar y combinar datos desde todos los archivos JSON en la carpeta
-        var folderPath = "trainingData/";
-        var trainingData = LoadDataFromFolder<QuestionPair>(folderPath);
+        //var folderPath = "trainingData/";
+        //var trainingData = LoadDataFromFolder<QuestionPair>(folderPath);
+
+        ModelTrain. LoadData();
+
+
+
+        while (true)
+        {
+            Console.WriteLine("Ingrese su mensaje (o 'salir' para terminar):");
+            var text = Console.ReadLine();
+
+            if (string.Equals(text, "salir", StringComparison.OrdinalIgnoreCase))
+            {
+                break;
+            }
+
+            // Usar el modelo para predecir la intención del mensaje
+         
+
+            Console.WriteLine($"Intención detectada: ");
+        }
+
+
+    }
+
+
+
+}
+
+
+
+
+
+
+
+
+
+
+
+
+public class ModelTrain
+{
+
+
+   public static async void LoadData()
+    {
+        var context = new MLContext();
+        var data = await GetHttp();
 
         // Filtrar stopwords y convertir a minúsculas antes de continuar con los datos de entrenamiento
-        trainingData = PreprocessData(trainingData);
+        var trainingData = PreprocessData(data);
 
         // Convertir las listas a IDataView
         var trainData = context.Data.LoadFromEnumerable(trainingData);
@@ -38,13 +85,15 @@ class Program
             .Append(context.Transforms.Concatenate("Features", "Features1", "Features2"))
             .Append(context.BinaryClassification.Trainers.SdcaLogisticRegression("Label", "Features")); // Algoritmo de clasificación
 
+        Console.WriteLine("Entrenando..");
         // Entrenar el modelo
         var model = pipeline.Fit(trainData);
 
         // Ruta del archivo del modelo
-        var modelPath = "qaModel.zip";
+        var modelPath = "questioModel.zip";
 
         // Guardar el modelo
+        Console.WriteLine("Guardando..");
         context.Model.Save(model, trainData.Schema, modelPath);
         Console.WriteLine("Modelo entrenado y guardado.");
 
@@ -53,11 +102,38 @@ class Program
         Console.WriteLine($"Tamaño del archivo del modelo: {fileInfo.Length / 1024.0} KB");
 
         // Mostrar predicciones con datos de entrenamiento
-        ShowPredictions(context, model, trainingData);
+        //  ShowPredictions(context, model, trainingData);
 
         // Evaluar el modelo con datos de prueba
-        EvaluateModelWithTestData(context, model);
+        // EvaluateModelWithTestData(context, model);
+
     }
+
+    public async static Task<List<QuestionPair>> GetHttp()
+    {
+        HttpClient client = new HttpClient();
+        var list = new List<QuestionPair>();
+
+        //client.BaseAddress = new Uri("https://localhost:7049/");
+        client.BaseAddress = new Uri("https://gotaskservice.com/");
+
+        try
+        {
+            var http = await client.GetAsync("Chat/GetModelToTrainByQuestion");
+            var respose = await http.Content.ReadAsStringAsync();
+            list = JsonConvert.DeserializeObject<List<QuestionPair>>(respose);
+            Console.WriteLine("Cantidad de registro :" + list.Count);
+        }
+        catch (Exception ex)
+        {
+
+            throw;
+        }
+        return list;
+
+    }
+
+
 
     static IEnumerable<T> LoadDataFromFolder<T>(string folderPath)
     {
@@ -200,7 +276,15 @@ class Program
             Label = pair.Label
         }).ToList();
     }
+
+
 }
+
+
+
+
+
+
 
 // Clases de datos
 public class QuestionPair
@@ -209,6 +293,9 @@ public class QuestionPair
     public string Question2 { get; set; }
     public bool Label { get; set; } // Añadido para la clasificación
 }
+
+
+
 
 public class QuestionPrediction
 {

@@ -82,11 +82,14 @@ public class IntentModel
             .Append(mlContext.Transforms.Conversion.MapKeyToValue("PredictedLabel", "PredictedLabel"));
 
         // Entrenamiento del modelo
+        Console.WriteLine("Entrenamiento del modelo :");
         var trainingPipeline = dataPipeline.Append(trainer);
         var model = trainingPipeline.Fit(data);
 
+        Console.WriteLine("Guardando :");
         // Guardar el modelo entrenado
         mlContext.Model.Save(model, data.Schema, "intentModel.zip");
+        Console.WriteLine("Gurdado modelo :");
     }
 
     public async static Task<List<MessageData>> GetHttp()
@@ -94,7 +97,8 @@ public class IntentModel
         HttpClient client = new HttpClient();
         var list = new List<MessageData>();
 
-        client.BaseAddress = new Uri("https://localhost:7049/");
+       //client.BaseAddress = new Uri("https://localhost:7049/");
+        client.BaseAddress = new Uri("https://gotaskservice.com/");
 
         try
         {
