@@ -90,7 +90,7 @@ public class ModelTrain
         var model = pipeline.Fit(trainData);
 
         // Ruta del archivo del modelo
-        var modelPath = "questioModel.zip";
+        var modelPath = "questioAndQuestionModel.zip";
 
         // Guardar el modelo
         Console.WriteLine("Guardando..");

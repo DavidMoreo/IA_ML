@@ -8,6 +8,8 @@ public class WordPositionInput
 {
     public string InputText { get; set; }
     public string Word { get; set; }
+    public string Position { get; set; } // "antes" o "después"
+
 }
 
 public class WordPositionOutput
@@ -28,9 +30,10 @@ public class WordPositionModel
     // Datos de entrenamiento para determinar la posición de la palabra
     private static readonly List<WordPositionData> TrainingData = new List<WordPositionData>
     {
-        new WordPositionData { InputText = "El clima está", Word = "agradable", Position = "después" },
-        new WordPositionData { InputText = "mucho me gusta", Word = "mucho", Position = "antes" },
-        new WordPositionData { InputText = "es una bebida", Word = "bebida", Position = "después" },
+        new WordPositionData { InputText = "que clima está", Word = "agradable", Position = "después" },
+        new WordPositionData { InputText = "yo", Word = "pienzo", Position = "después" },
+        new WordPositionData { InputText = "el", Word = "clima", Position = "después" },
+        new WordPositionData { InputText = "clima esta", Word = "raro", Position = "después" },
         // Agrega más ejemplos para mejorar el aprendizaje
     };
 
