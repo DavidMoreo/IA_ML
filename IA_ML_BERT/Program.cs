@@ -115,7 +115,7 @@ public class ModelTrain
         var list = new List<QuestionPair>();
 
         //client.BaseAddress = new Uri("https://localhost:7049/");
-        client.BaseAddress = new Uri("https://gotaskservice.com/");
+        client.BaseAddress = new Uri("https://compraenmiciudad.com/");
 
         try
         {

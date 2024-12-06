@@ -87,7 +87,7 @@ public class QuestionAnswerModel
 
         // Guardar el modelo entrenado
         Console.WriteLine("Guardando modelo");
-        mlContext.Model.Save(model, data.Schema, "ProductByName.zip");
+        mlContext.Model.Save(model, data.Schema, "../../../../MODEL/ProductByName.zip");
         Console.WriteLine("modelo Guardado");
     }
 
@@ -98,7 +98,7 @@ public class QuestionAnswerModel
         HttpClient client = new HttpClient();
         var list = new List<QuestionPair>();
 
-        client.BaseAddress = new Uri("https://gotaskservice.com/");
+        client.BaseAddress = new Uri("https://compraenmiciudad.com/");
 
         try
         {

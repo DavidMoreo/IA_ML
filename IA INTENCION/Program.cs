@@ -88,7 +88,7 @@ public class IntentModel
 
         Console.WriteLine("Guardando :");
         // Guardar el modelo entrenado
-        mlContext.Model.Save(model, data.Schema, "intentModel.zip");
+        mlContext.Model.Save(model, data.Schema, "../../../../MODEL/intentModel.zip");
         Console.WriteLine("Gurdado modelo :");
     }
 
@@ -98,7 +98,7 @@ public class IntentModel
         var list = new List<MessageData>();
 
        //client.BaseAddress = new Uri("https://localhost:7049/");
-        client.BaseAddress = new Uri("https://gotaskservice.com/");
+        client.BaseAddress = new Uri("https://compraenmiciudad.com/");
 
         try
         {
