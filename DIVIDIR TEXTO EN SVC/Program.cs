@@ -79,7 +79,7 @@ public class ProductDetector
         {
             trainingData.AddRange(list.Select(l => new WordData
             {
-                Word = l.Answer.ToLowerInvariant(),
+                Word = l.Answer.Replace("á", "a").Replace("é", "e").Replace("í", "i").Replace("ó", "o").Replace("ú", "u").ToLower(),
                 IsProduct = l.Label
             }));
         }
@@ -147,9 +147,46 @@ public class ProductDetector
         await TrainAndSaveModel();
 
         Console.WriteLine("Probando predicciones...");
-        string descripcionProductos = "Los productos tecnológicos actuales destacan por su innovación y funcionalidad. Desde teléfonos inteligentes como el iPhone 15, Samsung Galaxy S24, y Google Pixel 8, con pantallas de alta resolución y cámaras avanzadas, hasta laptops ultradelgadas como la MacBook Air M2, Dell XPS 13, y Lenovo ThinkPad X1 Carbon, con baterías de larga duración. Además, las tablets como el iPad Pro y Samsung Galaxy Tab S9 ofrecen versatilidad y portabilidad para el trabajo y el entretenimiento. Cada detalle está diseñado para ofrecer una experiencia de usuario superior. " +
-  "Estas características no solo facilitan la productividad, sino que también transforman la manera en que nos conectamos y disfrutamos del entretenimiento diario, ya sea viendo contenido en streaming en dispositivos como el Amazon Fire TV Stick o jugando con consolas como la PlayStation 5 o Xbox Series X. " +
-  "Además, los nuevos dispositivos incorporan tecnologías de vanguardia, como inteligencia artificial y conectividad 5G, para optimizar su rendimiento. Por ejemplo, los asistentes de voz integrados en productos como el Amazon Echo o Google Nest Audio permiten realizar tareas de manera más eficiente, mientras que la compatibilidad con aplicaciones avanzadas amplía las posibilidades de uso. Estas características demuestran el compromiso de las marcas por satisfacer las necesidades cambiantes de los consumidores modernos.";
+        string descripcionProductos =
+"- Kits básicos de aprendizaje de Arduino\n" +
+"- Robots móviles para proyectos educativos\n" +
+"- Drones controlados por Arduino\n" +
+"- Brazos robóticos programables\n" +
+"- Sensores de proximidad para robots\n" +
+"- Módulos de control remoto por Bluetooth\n" +
+"- Carros seguidores de línea\n" +
+"- Proyectos de domótica con Arduino\n" +
+"- Impresoras 3D controladas por microcontroladores\n" +
+"- Robots bípedos educativos\n" +
+"- Módulos de comunicación Wi-Fi para IoT\n" +
+"- Sistemas de riego automatizado con Arduino\n" +
+"- Vehículos autónomos para investigación\n" +
+"- Placas de expansión para Arduino\n" +
+"- Proyectos de reconocimiento de voz con Arduino\n" +
+"- Sensores ultrasónicos para evitar obstáculos\n" +
+"- Kits de drones autónomos\n" +
+"- Cámaras para visión robótica\n" +
+"- Robots recolectores de basura\n" +
+"- Proyectos de iluminación inteligente\n" +
+"- Relojes inteligentes basados en microcontroladores\n" +
+"- Estaciones meteorológicas controladas por Arduino\n" +
+"- Sistemas de monitoreo de calidad del aire\n" +
+"- Interfaces de control por gestos\n" +
+"- Robots araña programables\n" +
+"- Sensores de temperatura y humedad para proyectos\n" +
+"- Módulos GPS para rastreo\n" +
+"- Robots limpiadores de paneles solares\n" +
+"- Proyectos de brazo robótico para ensamblaje\n" +
+"- Kits de robots de competencia\n" +
+"- Robots submarinos de exploración\n" +
+"- Sensores de pulso y oxígeno para aplicaciones médicas\n" +
+"- Proyectos de control de motores con Arduino\n" +
+"- Controladores de servomotores para robótica\n" +
+"- Plataformas de vehículos controladas por aplicaciones móviles\n" +
+"- Módulos RFID para identificación automática.";
+
+
+
         DetectProductsInSentence(descripcionProductos.Replace("á","a").Replace("é", "e").Replace("í", "i").Replace("ó", "o").Replace("ú", "u"));
     }
 }
