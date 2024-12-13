@@ -3,114 +3,76 @@ using System.Collections.Generic;
 using System.Linq;
 using Microsoft.ML;
 using Microsoft.ML.Data;
-
-public class WordPositionInput
-{
-    public string InputText { get; set; }
-    public string Word { get; set; }
-    public string Position { get; set; } // "antes" o "después"
-
-}
-
-public class WordPositionOutput
-{
-    [ColumnName("PredictedLabel")]
-    public string PredictedPosition { get; set; } // "antes" o "después"
-}
-
-public class WordPositionData
-{
-    public string InputText { get; set; }
-    public string Word { get; set; }
-    public string Position { get; set; } // "antes" o "después"
-}
-
-public class WordPositionModel
-{
-    // Datos de entrenamiento para determinar la posición de la palabra
-    private static readonly List<WordPositionData> TrainingData = new List<WordPositionData>
-    {
-        new WordPositionData { InputText = "que clima está", Word = "agradable", Position = "después" },
-        new WordPositionData { InputText = "yo", Word = "pienzo", Position = "después" },
-        new WordPositionData { InputText = "el", Word = "clima", Position = "después" },
-        new WordPositionData { InputText = "clima esta", Word = "raro", Position = "después" },
-        // Agrega más ejemplos para mejorar el aprendizaje
-    };
-
-    // Método para entrenar el modelo
-    public static void TrainModel()
-    {
-        var mlContext = new MLContext();
-
-        // Cargar los datos de entrenamiento
-        var data = mlContext.Data.LoadFromEnumerable(TrainingData);
-
-        // Preprocesamiento de los datos (Convertir texto en números)
-        var dataPipeline = mlContext.Transforms.Text.FeaturizeText("Features", nameof(WordPositionData.InputText))
-            .Append(mlContext.Transforms.Conversion.MapValueToKey("Position", nameof(WordPositionData.Position)));
-
-        // Algoritmo de clasificación multiclase para la predicción de la posición
-        var trainer = mlContext.MulticlassClassification.Trainers.SdcaMaximumEntropy(
-            labelColumnName: "Position", featureColumnName: "Features")
-            .Append(mlContext.Transforms.Conversion.MapKeyToValue("PredictedLabel"));
-
-        // Entrenamiento del modelo
-        var trainingPipeline = dataPipeline.Append(trainer);
-        var model = trainingPipeline.Fit(data);
-
-        // Guardar el modelo entrenado
-        mlContext.Model.Save(model, data.Schema, "wordPositionModel.zip");
-    }
-
-    // Método para predecir si la palabra debe ir antes o después
-    public static string PredictWordPosition(string inputText, string word)
-    {
-        var mlContext = new MLContext();
-
-        // Cargar el modelo entrenado
-        var model = mlContext.Model.Load("wordPositionModel.zip", out var schema);
-
-        // Crear un predictor
-        var predictor = mlContext.Model.CreatePredictionEngine<WordPositionInput, WordPositionOutput>(model);
-
-        // Predecir la posición de la palabra
-        var input = new WordPositionInput { InputText = inputText, Word = word };
-        var result = predictor.Predict(input);
-
-        return result.PredictedPosition;
-    }
-}
+using Microsoft.ML.Transforms.Text;
 
 class Program
 {
-    static void Main(string[] args)
+    public class SentenceData
     {
-        // Entrenar el modelo (esto se hace una vez)
-        WordPositionModel.TrainModel();
+        public string Sentence { get; set; }
+        public string Category { get; set; }  // La categoría a predecir
+    }
 
-        // Bucle para permitir al usuario probar la predicción
+    public class SentencePrediction
+    {
+        public string PredictedCategory { get; set; }
+    }
+
+    static void Main()
+    {
+        var context = new MLContext();
+
+        // Lista de frases con categorías definidas
+        var sentences = new List<SentenceData>
+        {
+            new SentenceData { Sentence = "Quiero comprar un teléfono móvil", Category = "Celular" },
+            new SentenceData { Sentence = "Estoy buscando un celular", Category = "Celular" },
+            new SentenceData { Sentence = "¿Tienen algún teléfono inteligente?", Category = "Celular" },
+            new SentenceData { Sentence = "¿Dónde puedo encontrar un smartphone?", Category = "Celular" },
+            new SentenceData { Sentence = "Necesito un televisor de 55 pulgadas", Category = "Televisor" },
+            new SentenceData { Sentence = "Busco un televisor 4K", Category = "Televisor" },
+            new SentenceData { Sentence = "Busco un tv 4K", Category = "Televisor" },
+        };
+
+        // Crear el conjunto de datos de entrenamiento
+        var data = context.Data.LoadFromEnumerable(sentences);
+
+        // Convertir las frases en vectores numéricos usando TextFeaturizingEstimator
+        var pipeline = context.Transforms.Text.FeaturizeText("Features", nameof(SentenceData.Sentence))
+            .Append(context.Transforms.Conversion.MapValueToKey("Label", nameof(SentenceData.Category)))
+            .Append(context.MulticlassClassification.Trainers.SdcaMaximumEntropy("Label", "Features"))
+            .Append(context.Transforms.Conversion.MapKeyToValue("PredictedCategory", "PredictedLabel"));
+
+        // Entrenar el modelo
+        var model = pipeline.Fit(data);
+
+        // Realizar las predicciones
+        var predictions = model.Transform(data);
+
+        // Mostrar los resultados
+        var result = context.Data.CreateEnumerable<SentencePrediction>(predictions, reuseRowObject: false).ToList();
+
+        for (int i = 0; i < result.Count; i++)
+        {
+            Console.WriteLine($"Frase: {sentences[i].Sentence} -> Categoría Predicha: {result[i].PredictedCategory}");
+        }
+
+        // Agregar nuevas frases indefinidamente por consola
         while (true)
         {
-            Console.WriteLine("Ingrese un texto para completar (o 'salir' para terminar):");
-            var inputText = Console.ReadLine();
+            Console.WriteLine("Ingresa una frase (o 'salir' para terminar): ");
+            var userInput = Console.ReadLine();
+            if (userInput.ToLower() == "salir") break;
 
-            if (string.Equals(inputText, "salir", StringComparison.OrdinalIgnoreCase))
+            var newSentence = new List<SentenceData> { new SentenceData { Sentence = userInput } };
+            var newData = context.Data.LoadFromEnumerable(newSentence);
+            var newPredictions = model.Transform(newData);
+            var newResult = context.Data.CreateEnumerable<SentencePrediction>(newPredictions, reuseRowObject: false).ToList();
+
+            foreach (var pred in newResult)
             {
-                break;
+                Console.WriteLine($"Frase: {userInput} -> Categoría Predicha: {pred.PredictedCategory}");
             }
-
-            Console.WriteLine("Ingrese una palabra que desea agregar al texto:");
-            var word = Console.ReadLine();
-
-            // Usar el modelo para predecir si la palabra va antes o después
-            string position = WordPositionModel.PredictWordPosition(inputText, word);
-
-            // Insertar la palabra en la posición correcta
-            string completedText = position == "antes"
-                ? word + " " + inputText
-                : inputText + " " + word;
-
-            Console.WriteLine($"Texto completado: '{completedText}'");
         }
     }
 }

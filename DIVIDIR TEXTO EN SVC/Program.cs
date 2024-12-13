@@ -148,41 +148,8 @@ public class ProductDetector
 
         Console.WriteLine("Probando predicciones...");
         string descripcionProductos =
-"- Kits básicos de aprendizaje de Arduino\n" +
+"cubre camara pc\n" +
 "- Robots móviles para proyectos educativos\n" +
-"- Drones controlados por Arduino\n" +
-"- Brazos robóticos programables\n" +
-"- Sensores de proximidad para robots\n" +
-"- Módulos de control remoto por Bluetooth\n" +
-"- Carros seguidores de línea\n" +
-"- Proyectos de domótica con Arduino\n" +
-"- Impresoras 3D controladas por microcontroladores\n" +
-"- Robots bípedos educativos\n" +
-"- Módulos de comunicación Wi-Fi para IoT\n" +
-"- Sistemas de riego automatizado con Arduino\n" +
-"- Vehículos autónomos para investigación\n" +
-"- Placas de expansión para Arduino\n" +
-"- Proyectos de reconocimiento de voz con Arduino\n" +
-"- Sensores ultrasónicos para evitar obstáculos\n" +
-"- Kits de drones autónomos\n" +
-"- Cámaras para visión robótica\n" +
-"- Robots recolectores de basura\n" +
-"- Proyectos de iluminación inteligente\n" +
-"- Relojes inteligentes basados en microcontroladores\n" +
-"- Estaciones meteorológicas controladas por Arduino\n" +
-"- Sistemas de monitoreo de calidad del aire\n" +
-"- Interfaces de control por gestos\n" +
-"- Robots araña programables\n" +
-"- Sensores de temperatura y humedad para proyectos\n" +
-"- Módulos GPS para rastreo\n" +
-"- Robots limpiadores de paneles solares\n" +
-"- Proyectos de brazo robótico para ensamblaje\n" +
-"- Kits de robots de competencia\n" +
-"- Robots submarinos de exploración\n" +
-"- Sensores de pulso y oxígeno para aplicaciones médicas\n" +
-"- Proyectos de control de motores con Arduino\n" +
-"- Controladores de servomotores para robótica\n" +
-"- Plataformas de vehículos controladas por aplicaciones móviles\n" +
 "- Módulos RFID para identificación automática.";
 
 

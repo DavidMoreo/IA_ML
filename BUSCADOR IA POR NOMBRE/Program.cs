@@ -2,6 +2,8 @@
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
+using System.Net.Http;
+using System.Threading.Tasks;
 using Microsoft.ML;
 using Microsoft.ML.Data;
 using Newtonsoft.Json;
@@ -10,7 +12,6 @@ public class QuestionPair
 {
     public string Question { get; set; }
     public string Answer { get; set; }
-
     public bool Label { get; set; }
 }
 
@@ -31,151 +32,130 @@ public class QuestionPairOutput
     [ColumnName("PredictedLabel")]
     public string Answer { get; set; }
 
-    public float[] Score { get; set; }  // Puntajes de confianza para cada clase
+    public float[] Score { get; set; }  // Confidence scores for each class
 }
 
 public class QuestionAnswerModel
 {
-    // Método para cargar datos desde archivos JSON en una carpeta
-    public static List<QuestionPair> LoadDataFromFolder(string folderPath)
+    private static readonly string ModelPath = "../../../../MODEL/productDetectionModel.zip";
+    private static readonly HttpClient client = new HttpClient
     {
-        var trainingData = new List<QuestionPair>();
+        BaseAddress = new Uri("https://localhost:7049/") // Change the URL as needed
+    };
 
-        foreach (var filePath in Directory.GetFiles(folderPath, "*.json"))
-        {
-            var jsonData = File.ReadAllText(filePath);
-            var questionPairs = JsonConvert.DeserializeObject<List<QuestionPair>>(jsonData);
-
-            // Filtrar las palabras vacías de las preguntas
-            foreach (var pair in questionPairs)
-            {
-                pair.Question = string.Join(" ", FilterStopWords(pair.Question.Split(' ')));
-            }
-
-            trainingData.AddRange(questionPairs);
-        }
-
-        return trainingData;
-    }
-
-    // Método para entrenar el modelo
-    public static async void TrainModel(string folderPath)
+    // Method to train the model
+    public static async Task TrainModelAsync(string folderPath)
     {
-        // Cargar los datos
-       // var trainingData = LoadDataFromFolder(folderPath);
-        var trainingData = await GetHttp();
-
-        // Crear el contexto de ML.NET
-        var mlContext = new MLContext();
-
-        // Convertir los datos en un IDataView
-        var data = mlContext.Data.LoadFromEnumerable(trainingData);
-
-        // Preprocesamiento de datos (Convertir texto en números)
-        var dataPipeline = mlContext.Transforms.Text.FeaturizeText("Features", nameof(QuestionPair.Question))
-            .Append(mlContext.Transforms.Conversion.MapValueToKey("Label", nameof(QuestionPair.Answer)))
-            .Append(mlContext.Transforms.NormalizeMinMax("Features"));
-
-        // Algoritmo de clasificación multiclase
-        var trainer = mlContext.MulticlassClassification.Trainers.SdcaMaximumEntropy(labelColumnName: "Label", featureColumnName: "Features")
-            .Append(mlContext.Transforms.Conversion.MapKeyToValue("PredictedLabel"));
-
-        // Entrenamiento del modelo
-        Console.WriteLine("Entrenamiento");
-        var trainingPipeline = dataPipeline.Append(trainer);
-        var model = trainingPipeline.Fit(data);
-
-        // Guardar el modelo entrenado
-        Console.WriteLine("Guardando modelo");
-        mlContext.Model.Save(model, data.Schema, "../../../../MODEL/ProductByName.zip");
-        Console.WriteLine("modelo Guardado");
-    }
-
-
-
-    public async static Task<List<QuestionPair>> GetHttp()
-    {
-        HttpClient client = new HttpClient();
-        var list = new List<QuestionPair>();
-
-        client.BaseAddress = new Uri("https://compraenmiciudad.com/");
-
         try
         {
-            var http = await client.GetAsync("Chat/GetTrainIaProductName");
-            var respose = await http.Content.ReadAsStringAsync();
-            list = JsonConvert.DeserializeObject<List<QuestionPair>>(respose);
-            Console.WriteLine("Cantidad de registro :" + list.Count);
+            // Load training data
+            var trainingData = await GetTrainingDataAsync();
+
+            // Create ML.NET context
+            var mlContext = new MLContext();
+
+            // Convert data to IDataView
+            var data = mlContext.Data.LoadFromEnumerable(trainingData);
+
+            // Data preprocessing (Convert text to numeric features)
+            var dataPipeline = mlContext.Transforms.Text.FeaturizeText("Features", nameof(QuestionPair.Question))
+                .Append(mlContext.Transforms.Conversion.MapValueToKey("Label", nameof(QuestionPair.Answer)))
+                .Append(mlContext.Transforms.NormalizeMinMax("Features"));
+
+            // Multiclass classification algorithm
+            var trainer = mlContext.MulticlassClassification.Trainers.SdcaMaximumEntropy(labelColumnName: "Label", featureColumnName: "Features")
+                .Append(mlContext.Transforms.Conversion.MapKeyToValue("PredictedLabel"));
+
+            // Model training
+            Console.WriteLine("Training model...");
+            var trainingPipeline = dataPipeline.Append(trainer);
+            var model = trainingPipeline.Fit(data);
+
+            // Save the trained model
+            Console.WriteLine("Saving model...");
+            mlContext.Model.Save(model, data.Schema, ModelPath);
+            Console.WriteLine("Model saved.");
         }
         catch (Exception ex)
         {
-
-            throw;
+            Console.WriteLine($"An error occurred during model training: {ex.Message}");
+            // Log the exception if necessary
         }
-        return list;
-
     }
 
+    // Method to fetch training data from an API
+    private static async Task<List<QuestionPair>> GetTrainingDataAsync()
+    {
+        try
+        {
+            var response = await client.GetAsync("Chat/GetTrainIaProductName");
+            response.EnsureSuccessStatusCode();  // Ensures that a successful HTTP status code is received
+            var jsonResponse = await response.Content.ReadAsStringAsync();
+            var list = JsonConvert.DeserializeObject<List<QuestionPair>>(jsonResponse);
+            Console.WriteLine($"Number of records fetched: {list.Count}");
+            return list;
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"An error occurred while fetching training data: {ex.Message}");
+            // Optionally, rethrow or handle the exception as appropriate
+            return new List<QuestionPair>();
+        }
+    }
 
-    // Método para predecir la respuesta basada en una pregunta
+    // Method to predict the answer based on a question
     public static (string Answer, float Score) PredictAnswer(string question)
     {
-        var mlContext = new MLContext();
+        try
+        {
+            var mlContext = new MLContext();
 
-        // Filtrar palabras vacías de la pregunta
-        var filteredQuestion = string.Join(" ", FilterStopWords(question.Split(' ')));
+            // Preprocess the question (remove stop words)
+            var filteredQuestion = string.Join(" ", FilterStopWords(question.Split(' ')));
 
-        // Cargar el modelo entrenado
-        var model = mlContext.Model.Load("ProductByName.zip", out var schema);
+            // Load the trained model
+            var model = mlContext.Model.Load(ModelPath, out var schema);
 
-        // Crear un predictor
-        var predictor = mlContext.Model.CreatePredictionEngine<QuestionPairInput, QuestionPairOutput>(model);
+            // Create a prediction engine
+            var predictor = mlContext.Model.CreatePredictionEngine<QuestionPairInput, QuestionPairOutput>(model);
 
-        // Predecir la respuesta
-        var input = new QuestionPairInput { Question = filteredQuestion };
-        var result = predictor.Predict(input);
+            // Predict the answer
+            var input = new QuestionPairInput { Question = filteredQuestion };
+            var result = predictor.Predict(input);
 
-        // Obtener el puntaje más alto y su índice
-        var maxScore = result.Score.Max();
-        var predictedAnswer = result.Answer;
+            // Get the highest score and its corresponding predicted answer
+            var maxScore = result.Score.Max();
+            var predictedAnswer = result.Answer;
 
-        return (predictedAnswer, maxScore);
+            return (predictedAnswer, maxScore);
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"An error occurred during prediction: {ex.Message}");
+            return (string.Empty, 0f); // Return default values in case of an error
+        }
     }
 
-    // Método para filtrar palabras vacías de un conjunto de tokens
-    static string[] FilterStopWords(string[] tokens)
+    // Method to filter out stop words from a set of tokens
+    private static string[] FilterStopWords(string[] tokens)
     {
         var stopwords = new HashSet<string>(new[]
         {
             "el", "la", "los", "las", "de", "en", "y", "a", "que", "es", "con", "por", "como", "para", "un", "una", "al", "se",
-            "él", "ella", "ellos", "ellas", "del", "á", "é", "í", "ó", "ú", "áéíóú", "cómo", "cuándo", "dónde", "qué", "qué"
-            // Añade más palabras comunes acentuadas si es necesario
+            "él", "ella", "ellos", "ellas", "del", "á", "é", "í", "ó", "ú" // Add more stop words as needed
         });
 
-        var list = tokens.Where(token => !stopwords.Contains(token.ToLower())).ToArray();
-
-        for (int i = 0; i < list.Length; i++)
-        {
-            list[i] = CleanStopword(list[i]);
-        }
-
-        return list;
-    }
-
-    // Método para limpiar una palabra si es necesario
-    static string CleanStopword(string token)
-    {
-        // Aquí podrías añadir lógica adicional para limpiar el token si es necesario
-        return token;
+        return tokens.Where(token => !stopwords.Contains(token.ToLower())).ToArray();
     }
 }
+
 
 class Program
 {
     static void Main(string[] args)
     {
         // Entrenar el modelo (esto lo haces una vez)
-        QuestionAnswerModel.TrainModel("trainingData/");
+        QuestionAnswerModel.TrainModelAsync("trainingData/");
 
         // Bucle infinito para permitir preguntas continuas
         while (true)
