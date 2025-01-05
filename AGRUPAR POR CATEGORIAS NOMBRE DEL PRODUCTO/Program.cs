@@ -6,31 +6,9 @@ using Microsoft.ML;
 using Microsoft.ML.Data;
 using Microsoft.ML.Transforms.Text;
 using Newtonsoft.Json;
-using static Program;
 
 class Program
 {
-   
-    static async Task Main()
-    {
-        var data = new LoadData();
-        data.LoadAsync();
-        while (true) { }
-    }
-
-  
-}
-
-
-class LoadData
-{
-    public class ModelToTrainAssistan
-    {
-        public string Question { get; set; }
-        public string Answer { get; set; }
-        public bool Label { get; set; }
-    }
-
     public class SentenceData
     {
         public string Question { get; set; }
@@ -51,8 +29,7 @@ class LoadData
         public Guid? Id { get; set; }
     }
 
-    public string Route { get { return "../../../../MODEL/ModelIAAssistant.zip"; } }
-    public async Task LoadAsync()
+    static async Task Main()
     {
         var context = new MLContext();
 
@@ -82,7 +59,7 @@ class LoadData
         var model = pipeline.Fit(data);
 
         Console.WriteLine("Guardando el modelo entrenado.");
-        context.Model.Save(model, data.Schema, Route);
+        context.Model.Save(model, data.Schema, "../../../../MODEL/modelo_entrenado.zip");
         Console.WriteLine("Modelo guardado como 'modelo_entrenado.zip'.");
 
         // Realizar predicciones en tiempo real
@@ -106,17 +83,18 @@ class LoadData
             Console.WriteLine($"Predicción: {prediction.PredictedCategory}  Score : {max}");
         }
     }
-    public async static Task<List<ModelToTrainAssistan>> GetHttp()
+
+    public async static Task<List<NameConcept>> GetHttp()
     {
         HttpClient client = new HttpClient();
-        var list = new List<ModelToTrainAssistan>();
+        var list = new List<NameConcept>();
 
         client.BaseAddress = new Uri("https://localhost:7049/");
         try
         {
-            var http = await client.GetAsync("Chat/GetModelToTrainAssistan");
+            var http = await client.GetAsync("Chat/GetAllIANamePublic");
             var response = await http.Content.ReadAsStringAsync();
-            list = JsonConvert.DeserializeObject<List<ModelToTrainAssistan>>(response);
+            list = JsonConvert.DeserializeObject<List<NameConcept>>(response);
         }
         catch (Exception ex)
         {
@@ -126,19 +104,18 @@ class LoadData
         return list;
     }
 
-    public static List<SentenceData> MapToSentenceData(List<ModelToTrainAssistan> nameConcepts)
+    public static List<SentenceData> MapToSentenceData(List<NameConcept> nameConcepts)
     {
         var sentenceData = new List<SentenceData>();
 
         foreach (var concept in nameConcepts)
         {
-            if (!string.IsNullOrEmpty(concept.Question) && !string.IsNullOrEmpty(concept.Question))
+            if (!string.IsNullOrEmpty(concept.Name) && !string.IsNullOrEmpty(concept.Value))
             {
                 sentenceData.Add(new SentenceData
                 {
-                    Question = concept.Question,
-                    Category = concept.Answer
-
+                    Question = concept.Name,
+                    Category = concept.Value
                 });
             }
         }
