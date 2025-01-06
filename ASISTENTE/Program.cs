@@ -10,7 +10,7 @@ using static Program;
 
 class Program
 {
-   
+
     static async Task Main()
     {
         var data = new LoadData();
@@ -18,7 +18,7 @@ class Program
         while (true) { }
     }
 
-  
+
 }
 
 
@@ -71,14 +71,30 @@ class LoadData
         // Crear el conjunto de datos de entrenamiento
         var data = context.Data.LoadFromEnumerable(sentences);
 
-        // Construir la pipeline
+        //// Construir la pipeline
         var pipeline = context.Transforms.Text.FeaturizeText("Features", nameof(SentenceData.Question))
             .Append(context.Transforms.Conversion.MapValueToKey("Label", nameof(SentenceData.Category)))
-            .Append(context.MulticlassClassification.Trainers.SdcaMaximumEntropy("Label", "Features"))
+            .Append(context.MulticlassClassification.Trainers.SdcaMaximumEntropy("Label", "Features", null, null, 10))
             .Append(context.Transforms.Conversion.MapKeyToValue("PredictedCategory", "PredictedLabel"));
 
+        //    var pipeline = context.Transforms.Text.FeaturizeText("Features", nameof(SentenceData.Question))
+        //.Append(context.Transforms.Conversion.MapValueToKey("Label", nameof(SentenceData.Category)))
+        //.Append(context.MulticlassClassification.Trainers.SdcaMaximumEntropy("Label", "Features"))
+        //.Append(context.Transforms.Conversion.MapKeyToValue("PredictedCategory", "PredictedLabel"));
+
+
+        //// Construir el pipeline
+        //var pipeline = context.Transforms.Text.FeaturizeText("Features", nameof(SentenceData.Question))
+        //    .Append(context.Transforms.Conversion.MapValueToKey("Label", nameof(SentenceData.Category)))
+        //    .Append(context.MulticlassClassification.Trainers.SdcaMaximumEntropy("Label", "Features", null, null, 10))
+        //    .Append(context.Transforms.Conversion.MapKeyToValue("PredictedCategory", "PredictedLabel"))
+        //    .Append(context.Clustering.Trainers.KMeans(
+        //        featureColumnName: "Features")); // Número de clústeres deseado
+
+
+
         // Entrenar el modelo
-        Console.WriteLine("Entrenando modelo.");
+        Console.WriteLine("Entrenando modelo. " + sentences.Count());
         var model = pipeline.Fit(data);
 
         Console.WriteLine("Guardando el modelo entrenado.");
@@ -125,6 +141,7 @@ class LoadData
 
         return list;
     }
+    //  var responseChat = await _Chat.GetAllChatIaConfigByType(config, tblChatTypeModelIa.SearchProductsByName);
 
     public static List<SentenceData> MapToSentenceData(List<ModelToTrainAssistan> nameConcepts)
     {
